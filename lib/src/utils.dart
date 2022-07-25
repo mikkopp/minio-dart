@@ -64,32 +64,42 @@ String encodeQueries(Map<String, dynamic> queries) {
 }
 
 class MaxChunkSize extends StreamTransformerBase<Uint8List, Uint8List> {
+  final StreamController<Uint8List> _controller =
+      StreamController<Uint8List>.broadcast();
+
   MaxChunkSize(this.size);
 
   final int size;
 
   @override
-  Stream<Uint8List> bind(Stream<Uint8List> stream) async* {
-    await for (var chunk in stream) {
+  Stream<Uint8List> bind(Stream<Uint8List> stream) {
+    stream.listen((chunk) {
       if (chunk.length < size) {
-        yield chunk;
-        continue;
+        _controller.add(chunk);
+        return;
       }
 
       final blocks = chunk.length ~/ size;
 
       for (var i = 0; i < blocks; i++) {
-        yield Uint8List.sublistView(chunk, i * size, (i + 1) * size);
+        _controller.add(Uint8List.sublistView(chunk, i * size, (i + 1) * size));
       }
 
       if (blocks * size < chunk.length) {
-        yield Uint8List.sublistView(chunk, blocks * size);
+        _controller.add(Uint8List.sublistView(chunk, blocks * size));
       }
-    }
+    }, onDone: () {
+      _controller.close();
+    });
+
+    return _controller.stream;
   }
 }
 
 class MinChunkSize extends StreamTransformerBase<Uint8List, Uint8List> {
+  final StreamController<Uint8List> _controller =
+      StreamController<Uint8List>.broadcast();
+
   MinChunkSize(this.size);
 
   final int size;
@@ -97,23 +107,26 @@ class MinChunkSize extends StreamTransformerBase<Uint8List, Uint8List> {
   var _yielded = false;
 
   @override
-  Stream<Uint8List> bind(Stream<Uint8List> stream) async* {
+  Stream<Uint8List> bind(Stream<Uint8List> stream) {
     var buffer = BytesBuilder(copy: false);
 
-    await for (var chunk in stream) {
+    stream.listen((chunk) {
       buffer.add(chunk);
 
       if (buffer.length < size) {
-        continue;
+        return;
       }
 
-      yield buffer.takeBytes();
+      _controller.add(buffer.takeBytes());
       _yielded = true;
-    }
+    }, onDone: () {
+      if (buffer.isNotEmpty || !_yielded) {
+        _controller.add(buffer.takeBytes());
+      }
+      _controller.close();
+    });
 
-    if (buffer.isNotEmpty || !_yielded) {
-      yield buffer.takeBytes();
-    }
+    return _controller.stream;
   }
 }
 

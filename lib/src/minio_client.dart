@@ -31,9 +31,9 @@ class MinioRequest extends BaseRequest {
     } else if (body is String) {
       final data = Utf8Encoder().convert(body);
       headers['content-length'] = data.length.toString();
-      stream = Stream<Uint8List>.value(data);
+      stream = Stream<Uint8List>.value(data).asBroadcastStream();
     } else if (body is Uint8List) {
-      stream = Stream<Uint8List>.value(body);
+      stream = Stream<Uint8List>.value(body).asBroadcastStream();
       headers['content-length'] = body.length.toString();
     } else {
       throw UnsupportedError('Unsupported body type: ${body.runtimeType}');
@@ -152,6 +152,10 @@ class MinioClient {
       'x-amz-content-sha256': sha256sum,
     });
 
+    if (minio.sessionToken != null) {
+      request.headers['x-amz-security-token'] = minio.sessionToken!;
+    }
+
     final authorization = signV4(minio, request, date, region);
     request.headers['authorization'] = authorization;
 
@@ -253,6 +257,7 @@ class MinioClient {
       if (object != null) path = '/$object';
     } else {
       if (bucket != null) path = '/$bucket';
+      // if (object != null) path = '/$object';
       if (object != null) path = '/$bucket/$object';
     }
 

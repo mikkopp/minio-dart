@@ -162,13 +162,13 @@ class PostPolicy {
   /// set bucket name
   void setBucket(bucket) {
     MinioInvalidBucketNameError.check(bucket);
-    policy['conditions'].push(['eq', r'$bucket', bucket]);
+    policy['conditions'].add(['eq', r'$bucket', bucket]);
     formData['bucket'] = bucket;
   }
 
   /// set Content-Type
   void setContentType(String type) {
-    policy['conditions'].push(['eq', r'$Content-Type', type]);
+    policy['conditions'].add(['eq', r'$Content-Type', type]);
     formData['Content-Type'] = type;
   }
 
